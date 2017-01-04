@@ -1,0 +1,78 @@
+<plugin id="HelpOverlay"
+        category="tr:UTAS"
+        name="tr:Help Overlay"
+        version="1.0"
+        isGraphical="true"
+        multipleInstance="false"
+        description="tr:Shows a help overlay on screen."
+        author="Connor Deckers (cdeckers) 2017">
+
+        <parameters>
+          <group id="g_basicSettings" name="tr: Overlay Settings">
+            <row id="r_helpName">
+              <string id="helpNameText" name="tr: Help Title" default="Help" />
+            </row>
+            <row id="r_controlbar">
+              <bool id="hijack" name="tr: Hijack existing Help Info panel?" default="true"/>
+            </row>
+                <row id="r_controlbaricon">
+                </row>
+                <row id="r_controlbarposition">
+                </row>
+            <row id="r_showonstart">
+              <bool id="showonstart" name="tr: Show help screen when tour starts?" default="true" />
+            </row>
+          </group>
+
+          <group id="g_helpspots" name="tr: Help Spots">
+            <elementlist id="information">
+              <group id="g_info_item">
+                <group id="g_arrowSettings" name="tr: Arrow Position">
+                  <row id="r_arrowDirection">
+                    <position id="itemPosition"
+                              name="tr:Position"
+                              availableValues="topleft,topright,bottomleft,bottomright,bottom,top,left,right"
+                              default="bottom"
+                              x="0" y="0"/>
+                  </row>
+                </group>
+                <group id="g_textSettings" name="tr: Text Settings">
+                  <row id="r_textInput">
+                    <string id="help" name="tr: Help text" />
+                  </row>
+                  <row id="r_fontSettings">
+                    <font id="font" name="tr: Font" default="Calibri" size="20" style="normal" />
+                  </row>
+                  <row id="r_color">
+                    <color id="fontcolor" name="tr: Font Colour" default="#000" needalpha="true" defaultalpha="1.0" />
+                  </row>
+                </group>
+              </group>
+            </elementlist>
+          </group>
+
+          <group id="g_startbutton" name="tr: Continue Action">
+            <row id="r_btnPos">
+              <position id="buttonPosition"
+                        name="tr:Button Position"
+                        availableValues="topleft,topright,bottomleft,bottomright,bottom,top,left,right,center"
+                        default="center"
+                        x="0" y="0"/>
+            </row>
+            <row id="r_buttonText">
+              <string id="btnTxt" name="tr: Button Text" default="Start"/>
+            </row>
+          </group>
+        </parameters>
+
+        <templates>
+            <template url="helpoverlay.tmpl" />
+            <template url="helpoverlay_bs.tmpl"  type="jsbootstrap" />
+            <template url="helpoverlay_bsle.tmpl" type="jsbootstraploaded" />
+            <template url="jsevents.tmpl" />
+        </templates>
+
+        <resources>
+        </resources>
+
+</plugin>

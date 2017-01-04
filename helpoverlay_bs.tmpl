@@ -1,0 +1,278 @@
+/**
+* Name: Visited Hotspot Tracker
+* Author: Connor Deckers (cdeckers)
+* Date: 24 November 2016
+*/
+
+// Progress
+// TODO: Implement SVG arrow overlays
+// TODO: Add boxes
+// TODO: Add under-overlay (behind the help containers)
+// TODO: Run on start of tour
+// TODO: Test and progress
+
+var plugin_helpOverlay = (plugin_helpOverlay !== undefined ? plugin_helpOverlay : (function( $ , undefined ) {
+  function plugin(args) {
+    var pub = {}; //Public facing functions and variables.
+    var priv = {}; //Helper container to hold known-private variables.
+
+    var settings = {};
+    var defaults = {
+      id: '',   //Plugin ID
+      font: {   //Font defaults
+        size: '12px',
+        family: 'Calibri',
+        decoration: 'none',
+        style: 'normal',
+        weight: 'normal',
+        color: 'white',
+        shadow: '',
+        lineheight: '',
+      },
+      position: 'topleft', //Onscreen position of the information element
+      visibility: true,   //Is the element visible?
+    }
+
+    //Add our defaults and overrides to our primary settings object.
+    settings = $.extend(true, {}, defaults, args);
+
+    //If the item has no id, then break the creation and close code.
+    if(settings.id == '')
+    {
+      console.error("Invalid ID set.");
+      return false;
+    }
+
+    /**
+     * Identifies the version of the plugin
+     * @type {Number}
+     */
+    pub.version = 0.01;
+
+
+   /*******************************
+    *       PUBLIC FUNCTIONS      *
+    *******************************/
+
+    /**
+     * Allows the user to toggle the visibility of the text, for hooking into hide/show control events.
+     * If called without a state argument, it will return the items current visibility status.
+     * @author cdeckers
+     * @version 0.1
+     * @date    2016-12-22
+     * @param   {bool}   state The items visibility state (true; false;)
+     * @return  {bool}         Returns true if the item is successfully toggled.
+     */
+    pub.visible = function(state)
+    {
+      if(state === 'undefined') return settings.visibility;
+      if(priv.container === 'undefined') return null;
+      $(priv.container).css("display", state?"block":"none");
+      settings.visibility = state;
+      return true;
+    };
+
+    /*******************************
+     *        EVENT HANDLERS       *
+     *******************************/
+
+    //Fires when the tour begins initially.
+    $(document).on('pano_ontourstart', function() {
+      settings.Storage.StorageMethod = settings.Storage.StorageMethod.replace('storage', 'Storage'); priv.storage.get();
+      if(settings.Storage.AutosaveTime > 0) { setInterval(function(){if(priv.saveonreload){priv.storage.store();console.log("autosaving..");}}, settings.Storage.AutosaveTime*1000); /* Fires autosave event. */ }
+    });
+
+
+    /*******************************
+     *      PRIVATE FUNCTIONS      *
+     *******************************/
+
+    //Draws container onto the screen, ready for content to be added
+    priv.drawContainer = function()
+    {
+      if($('#'+settings.id).length === 0)
+      {
+        var textElem = document.createElement('div');
+        textElem.id = settings.id;
+
+        //Add the container of the square to the container of the tour
+        $(settings.parent).prepend(textElem);
+
+        $(textElem).css({
+            'position': 'absolute',
+            'z-index': '3018',
+            'overflow': 'visible',
+            'opacity': '1',
+            'text-size-adjust': 'none',
+            'pointer-events': 'none',
+            'background': 'none',
+            'cursor': 'default',
+            'width': settings.width+'px',
+          });
+
+        var cssPosition = {};
+        var size = 2;
+
+        //Calculate the position
+        switch (settings.position) {
+          case 'topleft':
+            cssPosition = { 'top': 0, 'left':0, 'margin-left': settings.margin.x, 'margin-top': settings.margin.y};
+            break;
+
+          case 'top':
+            cssPosition = { 'top': 0, 'left': '50%', 'margin-left': (size/2)+'px', 'margin-top': settings.margin.y };
+            break;
+
+          case 'topright':
+            cssPosition = { 'top': 0, 'right': 0, 'margin-top': settings.margin.y, 'margin-right': settings.margin.x };
+            break;
+
+          case 'right':
+            cssPosition = { 'top': '50%', 'margin-top':(size/2)+'px', 'right':0, 'margin-right': settings.margin.x };
+            break;
+
+          case 'bottomright':
+            cssPosition = { 'bottom': 0, 'right': 0, 'margin-right': settings.margin.x, 'margin-bottom': settings.margin.y };
+            break;
+
+          case 'bottom':
+            cssPosition = { 'bottom': 0, 'left': '50%', 'margin-left': (size/2)+'px', 'margin-bottom': settings.margin.y }
+            break;
+
+          case 'bottomleft':
+            cssPosition = { 'bottom' : 0, 'left' : 0,  'margin-bottom': settings.margin.y, 'margin-left': settings.margin.x };
+            break;
+
+          case 'left':
+            cssPosition = {'left': 0, 'top': '50%', 'margin-top':(size/2)+'px', 'margin-left': settings.margin.x }
+            break;
+
+          case 'center':
+            cssPosition = {'top': '50%', 'margin-top':(size/2)+'px', 'left': '50%', 'margin-left': (size/2)+'px'}
+            break;
+        }
+
+        //Apply the position
+        $(textElem).css(cssPosition);
+        priv.styles.build();
+      }
+      priv.container = $('#'+settings.id);
+      return $('#'+settings.id);
+    };
+
+    //Format and insert the content. Is called every time the information needs to be updated.
+    priv.drawContent = function(container)
+    {
+      if(typeof container == 'undefined') { container = priv.container; }
+      var string = '<div class="spot-box">';
+      var spots = priv.sorted;
+      if(spots != null)
+      {
+        $.each(spots, function(name,spot) {
+          if(spot.display)
+          {
+            var seen = priv.history.size(priv.SceneID);
+            var total = priv.sorted[name]['items'].length;
+            if(settings.CompactView)
+            {
+              string += '<p class="spot-result" data-name="'+name+'">'+name+' '+seen+' / ' + (total) + '</p>';
+            }
+            else
+            {
+              string += '<p class="spot-result" data-name="'+name+'">'+name+'<br>Viewed '+seen+' / ' + (total) + '</p>';
+            }
+          }
+        });
+      }
+      else
+      {
+        string += "<p>No hotspots available.</p>";
+      }
+      string += "</div>";
+      $(container).html('<div class="'+settings.id+'text">'+string+'</div>');
+    };
+
+    //Draw me an arrow!
+    priv.drawArrow = function(elementID)
+    {
+      var svg = '<svg id="Arrow'+elementID+'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44.03 114.67"><defs><style>.cls-1{fill:none;stroke:#000;stroke-miterlimit:10;stroke-width:10px;}</style></defs><polygon id="Arrowhead'+elementID+'" class="svg-arrowhead" points="22.02 0 44.03 38.13 0 38.13 22.02 0"/><line id="Arrowline'+elementID+'" class="svg-arrowline cls-1" x1="22.02" y1="36.83" x2="22.02" y2="114.67"/></svg>';
+      return svg;
+    }
+
+    /* Style generator */
+    priv.styles = {
+      build: function() {
+        priv.styles.add(".spot-result", {
+          "font-family":      settings.font.family,
+          "font-weight":      settings.font.weight,
+          "font-style":       settings.font.style,
+          "text-decoration":  settings.font.decoration,
+          "font-size":        settings.font.size,
+          "color":            settings.font.color,
+          "line-height":      settings.font.lineheight,
+          "text-shadow":      settings.font.shadow,
+          "background-image": 'url('+settings.Resources+settings.LinkImage+')',
+          "background-repeat": "no-repeat",
+          "padding": "0px 0 0 32px",
+          "background-position": "0px",
+          "background-size": "contain",
+        });
+
+        priv.styles.generate();
+      },
+      add: function(identifier, rule) {
+        if(priv.CSS[identifier] == null) { priv.CSS[identifier] = {}; }
+        $.extend(priv.CSS[identifier], rule);
+      },
+      generate: function() {
+        var rules = "";
+        $.each(priv.CSS, function(id, props)
+        {
+          rules += id + " {\n";
+          $.each(props, function(property, rule) {
+            rules += "\t"+property+":"+rule+";\n";
+          });
+          rules += "}\n\n";
+        });
+        if($('style#helpoverlay').length == 0) { $("head").append("<style id='helpoverlay'></style>"); }
+        $("style#helpoverlay").append(rules);
+      }
+    };
+    return pub;
+  }
+
+  var items = {};
+  function manager() {
+    var pub = {};
+
+    pub.register = function(id, props)
+    {
+      if(items.hasOwnProperty(id)) { console.error("Can't reregister item."); return items[id]; }
+      else {
+        if(props == undefined) { props = {}; }
+        if(!props.hasOwnProperty('id')) { props = $.extend(true, props, {'id':id}); }
+        var p = new plugin(props);
+        items[id] = p; return p;
+      }
+    }
+
+    pub.get = function(id)
+    {
+      if(items.hasOwnProperty(id)) { return items[id]; }
+      else { console.error("Item with ID `" + id + "` doesn't exist. Register your item before you use .get()"); return false; }
+    }
+
+    pub.delete = function(id)
+    {
+      if(items.hasOwnProperty(id)) { delete items[id]; return items.hasOwnProperty(id); }
+    }
+
+    pub.dump = function()
+    {
+      console.log(items);
+    }
+
+    return pub;
+  }
+  return manager;
+}(jQuery)))

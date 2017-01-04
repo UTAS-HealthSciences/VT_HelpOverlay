@@ -1,0 +1,58 @@
+<ptplugin name="{{p.id}}" engine="visibleHotspots">
+	<settings>
+		<option name="consoleLog" value="{{ p.consoleLog.value }}" type="bool" />
+
+		<option name="position" value="{{ p.myPosition.positionString }}" type="string" />
+		<option name="containerWidth" value="{{p.containerWidth.value}}" type="int" />
+		<option name="compactView" value="{{p.compactView.value}}" type="bool" />
+		<option name="itemSpacing" value="{{p.itemSpacing.value}}" type="int" />
+
+		<option name="margin_x" value="{{ p.myPosition.x }}" type="int" />
+		<option name="margin_y" value="{{ p.myPosition.y }}" type="int" />
+
+		<option name="font_family" value="{{ p.font.family }}" type="string" />
+		<option name="font_bold" value="{{ p.font.bold }}" type="bool" />
+		<option name="font_italics" value="{{ p.font.italic }}" type="bool" />
+		<option name="font_underline" value="{{ p.font.underline }}" type="bool" />
+		<option name="font_strikethrough" value="{{ p.font.strikethrough }}" type="bool" />
+		<option name="font_size" value="{{p.font.size}}" type="int" />
+		<option name="font_colour" value="{{p.fontcolor.colorRRGGBB}}" type="string" />
+		<option name="font_colour_hover" value="{{p.fontcolorhover.colorRRGGBB}}" type="string" />
+		<option name="font_alpha" value="{{p.fontcolor.alpha}}" type="float" />
+
+		<option name="font_shadow" value="{{ p.fontshadow.value }}" type="bool" />
+
+		<option name="lineheight" value="{{ p.lineheight.value }}" type="int" />
+
+		<option name="data_dir" value="{{dataDirectory}}" type="string" />
+		<option name="plugin_dir" value="{{pluginDirectory}}" type="string" />
+	{% if p.visitedImage.value %}
+		<option name="imageSrc" value="{{p.visitedImage.fileName}}" type="string" />
+	{% else %}
+		<option name="imageSrc" value="checkbox.png" type="string" />
+	{% endif %}
+
+	{% if p.linkImage.value %}
+		<option name="linkImg" value="{{p.linkImage.fileName}}" type="string" />
+	{% else %}
+		<option name="linkImg" value="magnifyingglass.png" type="string" />
+	{% endif %}
+
+		<option name="visitedPanos" value="{{p.visitedPanos.value}}" type="bool" />
+		<option name="infoCycling" value="{{p.cycling.value}}" type="string" />
+
+		<option name="storageType" value="{{p.sessionOption.value}}" type="string" />
+		<option name="storageDuration" value="{{p.sessionDays.value}}" type="int" />
+
+		<option name="fp_show" value="{{p.showOnFloorplan.value}}" type="bool" />
+		<option name="fp_width" value="{{p.fp_width.value}}" type="int" />
+		<option name="fp_height" value="{{p.fp_height.value}}" type="int" />
+		<option name="fp_top" value="{{p.fp_top.value}}" type="int" />
+		<option name="fp_left" value="{{p.fp_left.value}}" type="int" />
+
+
+		// <option name="size" value="{{ p.mySize.value }}" type="int" />
+		// <option name="color" value="{{ p.myColor.colorRRGGBB }}" type="string" />
+		// <option name="alpha" value="{{ p.myColor.alpha }}" type="float" />
+	</settings>
+</ptplugin>

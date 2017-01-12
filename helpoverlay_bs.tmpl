@@ -4,33 +4,19 @@
 * Date: 24 November 2016
 */
 
-// Progress
-// TODO: Implement SVG arrow overlays
-// TODO: Add boxes
-// TODO: Add under-overlay (behind the help containers)
-// TODO: Run on start of tour
-// TODO: Test and progress
-
 var plugin_helpOverlay = (plugin_helpOverlay !== undefined ? plugin_helpOverlay : (function( $ , undefined ) {
   function plugin(args) {
     var pub = {}; //Public facing functions and variables.
-    var priv = {}; //Helper container to hold known-private variables.
+    var priv = {
+      children: [], //Formatted HTML objects that have been attached to the DOM.
+      items: [], //Raw content provided by the other plugins when they register
+    }; //Helper container to hold known-private variables.
+
+    priv.CSS = {};
 
     var settings = {};
     var defaults = {
       id: '',   //Plugin ID
-      font: {   //Font defaults
-        size: '12px',
-        family: 'Calibri',
-        decoration: 'none',
-        style: 'normal',
-        weight: 'normal',
-        color: 'white',
-        shadow: '',
-        lineheight: '',
-      },
-      position: 'topleft', //Onscreen position of the information element
-      visibility: true,   //Is the element visible?
     }
 
     //Add our defaults and overrides to our primary settings object.
@@ -55,178 +41,449 @@ var plugin_helpOverlay = (plugin_helpOverlay !== undefined ? plugin_helpOverlay 
     *******************************/
 
     /**
-     * Allows the user to toggle the visibility of the text, for hooking into hide/show control events.
-     * If called without a state argument, it will return the items current visibility status.
+     * Constructor function
      * @author cdeckers
-     * @version 0.1
-     * @date    2016-12-22
-     * @param   {bool}   state The items visibility state (true; false;)
-     * @return  {bool}         Returns true if the item is successfully toggled.
+     * @version [version]
+     * @date    2017-01-11
+     * @return  {void}
      */
-    pub.visible = function(state)
+    pub._construct = function()
     {
-      if(state === 'undefined') return settings.visibility;
-      if(priv.container === 'undefined') return null;
-      $(priv.container).css("display", state?"block":"none");
-      settings.visibility = state;
-      return true;
-    };
+      priv.build();
+      priv.builder.button();
+    }
 
-    /*******************************
-     *        EVENT HANDLERS       *
-     *******************************/
+    /**
+     * Registers an item with the parent Help Overlay plugin.
+     * @author cdeckers
+     * @version [version]
+     * @date    2017-01-11
+     * @param   {[type]}   item [description]
+     * @return  {[type]}        [description]
+     */
+    pub.register = function(item)
+    {
+      //Adds the item to our stack.
+      priv.items.push(item);
 
-    //Fires when the tour begins initially.
-    $(document).on('pano_ontourstart', function() {
-      settings.Storage.StorageMethod = settings.Storage.StorageMethod.replace('storage', 'Storage'); priv.storage.get();
-      if(settings.Storage.AutosaveTime > 0) { setInterval(function(){if(priv.saveonreload){priv.storage.store();console.log("autosaving..");}}, settings.Storage.AutosaveTime*1000); /* Fires autosave event. */ }
-    });
+      //Draw the item to the screen.
+      priv.draw(item);
+    }
+
+    /**
+     * Fires a callback for each child of the plugin.
+     * @author cdeckers
+     * @version [version]
+     * @date    2017-01-11
+     * @param   {Function} callback [description]
+     * @return  {[type]}            [description]
+     */
+    pub.items = function(callback)
+    {
+      //Check that the callback is a function.
+      if(typeof callback != 'function') { console.error("Callback needs to be a function. Type is " + typeof callback); return false; }
+
+      //Loop through each item and fire our callback for each one.
+      return $.each(priv.children, function(k,v) { callback.apply(this, [$(v)]); });
+    }
+
+    /**
+     * Sets the visiblity of the help elements and the overlay.
+     * @author cdeckers
+     * @version [version]
+     * @date    2017-01-11
+     * @param   {[type]}   visible [description]
+     * @return  {[type]}           [description]
+     */
+    pub.visible = function(visible)
+    {
+      $(priv.container).css('display', visible?'block':'none');
+      return $(priv.container).css('display') == 'block';
+    }
 
 
     /*******************************
      *      PRIVATE FUNCTIONS      *
      *******************************/
 
-    //Draws container onto the screen, ready for content to be added
-    priv.drawContainer = function()
+    priv.build = function()
     {
-      if($('#'+settings.id).length === 0)
-      {
-        var textElem = document.createElement('div');
-        textElem.id = settings.id;
+      priv.container = priv.builder.container();
+    };
 
-        //Add the container of the square to the container of the tour
-        $(settings.parent).prepend(textElem);
+    priv.draw = function(item)
+    {
+      var obj = {};
+      //Build the items container.
+      obj.container = priv.builder.item(item);
 
-        $(textElem).css({
+      //Build the arrow
+      obj.arrow = priv.builder.arrow(item);
+
+      //Build the text element.
+      obj.text = priv.builder.text(item);
+
+      //Attach these elements to the DOM.
+      priv.builder.attach(obj);
+
+      //Add our finished object to the stack.
+      priv.children.push(obj);
+    }
+
+    priv.cardinalPadding = 10;
+
+    priv.builder = {
+      container: function() {
+        if($('#'+settings.id).length === 0)
+        {
+          var textElem = document.createElement('div');
+          textElem.id = settings.id;
+
+          $(settings.parent).prepend(textElem);
+
+          $(textElem).css({
+              'position': 'absolute',
+              'z-index': '5000',
+              'overflow': 'hidden',
+              'pointer-events': 'all',
+              'background': 'rgba(255,255,255,0.25)',
+              'cursor': 'default',
+              'width': '100%',
+              'height': '100%',
+            });
+        }
+        return $('#'+settings.id);
+      },
+      item: function(data) {
+        var s = data.container;
+        var pos = { top: 'auto', left: 'auto', right: 'auto', bottom: 'auto', };
+        var paddingFix = {};
+
+        var origin = [];
+
+        if(s.position.indexOf("top") > -1) { pos.top = 0; origin.push('top') }
+        if(s.position.indexOf("left") > -1) { pos.left = 0; origin.push('left') }
+        if(s.position.indexOf("bottom") > -1) { pos.bottom = 0; origin.push('bottom') }
+        if(s.position.indexOf("right") > -1) { pos.right = 0; origin.push('right') }
+
+        var helpDiv = document.createElement('div');
+        helpDiv.id = s.id;
+        helpDiv.className = 'help-item-container';
+
+        if(data.arrow.direction == 'top' || data.arrow.direction == 'right' || data.arrow.direction == 'bottom' || data.arrow.direction == 'left')
+        {
+          paddingFix['padding-'+data.arrow.direction] = 0;
+        }
+
+        $(helpDiv).css({
+            'top':    pos.top,
+            'left':   pos.left,
+            'bottom': pos.bottom,
+            'right':  pos.right,
             'position': 'absolute',
-            'z-index': '3018',
-            'overflow': 'visible',
-            'opacity': '1',
-            'text-size-adjust': 'none',
-            'pointer-events': 'none',
-            'background': 'none',
-            'cursor': 'default',
-            'width': settings.width+'px',
+            'max-width':  s.size.x + 'px',
+            'max-height': s.size.y + 'px',
+            'border': 'thin black solid',
+            'border-radius': '3px',
+            'margin': s.offset.y + 'px ' + s.offset.x + 'px ' + s.offset.y + 'px ' + s.offset.x + 'px',
+            'background-color': 'rgba(' + s.background.join(',') + ')',
+            'padding': s.padding.y + 'px ' + s.padding.x + 'px',
           });
 
-        var cssPosition = {};
-        var size = 2;
+          $(helpDiv).css(paddingFix);
 
-        //Calculate the position
-        switch (settings.position) {
-          case 'topleft':
-            cssPosition = { 'top': 0, 'left':0, 'margin-left': settings.margin.x, 'margin-top': settings.margin.y};
-            break;
+          priv.styles.mobile('#'+s.id, {
+            'transform-origin': origin.join(' '),
+            'transform': 'scale(0.6)',
+          });
 
+          return $(helpDiv);
+      },
+      arrow: function(data) {
+        var s = data.arrow;
+
+        var rotation = {
+          'topleft': -45,
+          'top': 0,
+          'topright': 45,
+          'left': -90,
+          'bottomleft': -135,
+          'bottom': 180,
+          'bottomright': 135,
+          'right': 90,
+        };
+
+        var float = '';
+        var arrowpos = { top: 'auto', left: 'auto', right: 'auto', bottom: 'auto', };
+        if(s.position.indexOf("top") > -1) { arrowpos.top = s.offset.y;}
+        if(s.position.indexOf("left") > -1) { arrowpos.left = s.offset.x; float = 'left'; }
+        if(s.position.indexOf("bottom") > -1) { arrowpos.bottom = s.offset.y; }
+        if(s.position.indexOf("right") > -1) { arrowpos.right = s.offset.x; float = 'right'; }
+
+        switch(s.position)
+        {
           case 'top':
-            cssPosition = { 'top': 0, 'left': '50%', 'margin-left': (size/2)+'px', 'margin-top': settings.margin.y };
-            break;
-
-          case 'topright':
-            cssPosition = { 'top': 0, 'right': 0, 'margin-top': settings.margin.y, 'margin-right': settings.margin.x };
-            break;
-
-          case 'right':
-            cssPosition = { 'top': '50%', 'margin-top':(size/2)+'px', 'right':0, 'margin-right': settings.margin.x };
-            break;
-
-          case 'bottomright':
-            cssPosition = { 'bottom': 0, 'right': 0, 'margin-right': settings.margin.x, 'margin-bottom': settings.margin.y };
-            break;
-
           case 'bottom':
-            cssPosition = { 'bottom': 0, 'left': '50%', 'margin-left': (size/2)+'px', 'margin-bottom': settings.margin.y }
+            arrowpos.left = s.offset.x;
+            arrowpos.right = s.offset.x;
             break;
-
-          case 'bottomleft':
-            cssPosition = { 'bottom' : 0, 'left' : 0,  'margin-bottom': settings.margin.y, 'margin-left': settings.margin.x };
-            break;
-
           case 'left':
-            cssPosition = {'left': 0, 'top': '50%', 'margin-top':(size/2)+'px', 'margin-left': settings.margin.x }
-            break;
-
-          case 'center':
-            cssPosition = {'top': '50%', 'margin-top':(size/2)+'px', 'left': '50%', 'margin-left': (size/2)+'px'}
+          case 'right':
+            arrowpos.top = s.offset.y;
+            arrowpos.bottom = s.offset.y;
             break;
         }
 
-        //Apply the position
-        $(textElem).css(cssPosition);
-        priv.styles.build();
-      }
-      priv.container = $('#'+settings.id);
-      return $('#'+settings.id);
-    };
+        var margin = {};  var spacing = 0;
+        var cardinalPadding = 10;
+        var cardinals = ['top', 'left', 'bottom', 'right'];
+        if(cardinals.indexOf(s.direction) > -1)
+        {
+          arrowpos[s.direction] += cardinalPadding;
+          spacing = cardinalPadding;
+        }
 
-    //Format and insert the content. Is called every time the information needs to be updated.
-    priv.drawContent = function(container)
-    {
-      if(typeof container == 'undefined') { container = priv.container; }
-      var string = '<div class="spot-box">';
-      var spots = priv.sorted;
-      if(spots != null)
-      {
-        $.each(spots, function(name,spot) {
-          if(spot.display)
-          {
-            var seen = priv.history.size(priv.SceneID);
-            var total = priv.sorted[name]['items'].length;
-            if(settings.CompactView)
-            {
-              string += '<p class="spot-result" data-name="'+name+'">'+name+' '+seen+' / ' + (total) + '</p>';
-            }
-            else
-            {
-              string += '<p class="spot-result" data-name="'+name+'">'+name+'<br>Viewed '+seen+' / ' + (total) + '</p>';
-            }
-          }
+        var arrow = document.createElement('div');
+        arrow.id=s.id+'_arrow'; arrow.className = "arrow";
+
+        $(arrow).css({
+          position: 'relative',
+          width:    s.size.x + 'px',
+          height:   s.size.y + 'px',
+          'top':    arrowpos.top == 'auto' ? 'auto' : arrowpos.top + 'px',
+          'left':   arrowpos.lef == 'auto' ? 'auto' : arrowpos.left + 'px',
+          'bottom': arrowpos.bottom == 'auto' ? 'auto' : arrowpos.bottom + 'px',
+          'right':  arrowpos.right == 'auto' ? 'auto' : arrowpos.right + 'px',
+          'margin': 'auto',
+          'float': float,
         });
-      }
-      else
-      {
-        string += "<p>No hotspots available.</p>";
-      }
-      string += "</div>";
-      $(container).html('<div class="'+settings.id+'text">'+string+'</div>');
-    };
 
-    //Draw me an arrow!
-    priv.drawArrow = function(elementID)
-    {
-      var svg = '<svg id="Arrow'+elementID+'" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 44.03 114.67"><defs><style>.cls-1{fill:none;stroke:#000;stroke-miterlimit:10;stroke-width:10px;}</style></defs><polygon id="Arrowhead'+elementID+'" class="svg-arrowhead" points="22.02 0 44.03 38.13 0 38.13 22.02 0"/><line id="Arrowline'+elementID+'" class="svg-arrowline cls-1" x1="22.02" y1="36.83" x2="22.02" y2="114.67"/></svg>';
-      return svg;
+        //Stores our arrow position so that we can retrieve it for the text without recaluclating.
+        priv.arrow = priv.arrow || {};
+        priv.arrow[s.id] = priv.arrow[s.id] || {};
+        priv.arrow[s.id].arrowpos = arrowpos;
+        priv.arrow[s.id].padding = cardinalPadding;
+
+        priv.styles.attach('#'+s.id+'_arrow:before', {
+          'content': '""',
+          'position': 'absolute',
+          'width': '100%',
+          'height': '100%',
+          'z-index': '0',
+          'background': 'url('+s.image+') center center no-repeat',
+          'background-size': 'contain',
+          '-webkit-transform': 'rotate('+rotation[s.direction]+'deg)',
+          '-moz-transform': 'rotate('+rotation[s.direction]+'deg)',
+          '-ms-transform': 'rotate('+rotation[s.direction]+'deg)',
+          '-o-transform': 'rotate('+rotation[s.direction]+'deg)',
+          'transform': 'rotate('+rotation[s.direction]+'deg)',
+        });
+
+        priv.styles.attach('#'+s.id+'_arrow:before', margin);
+
+        return $(arrow);
+      },
+      text: function(data) {
+        var s = data.text;
+
+        var help = document.createElement('div'); help.id=s.id+'_help'; help.className='help-text-container';
+        $(help).html('<p class="help-text">'+s.content+'</p>');
+
+        var pos = priv.arrow[s.id].arrowpos;
+        var apad = priv.arrow[s.id].padding;
+
+        if(pos.top != 'auto' && data.arrow.direction == 'top') { pos.top = apad + 'px'; }
+        if(pos.bottom != 'auto' && data.arrow.direction == 'bottom') { pos.bottom = apad + 'px'; }
+        if(pos.left != 'auto' && data.arrow.direction == 'left') { pos.left = apad + 'px'; }
+        if(pos.right != 'auto' && data.arrow.direction == 'right') { pos.right = apad + 'px'; }
+
+        var float = '';
+        if(data.arrow.position.indexOf('left')) { float = 'right'; }
+        if(data.arrow.position.indexOf('right')) { float = 'left'; }
+
+        $(help).css({
+          'position': 'relative',
+          'margin-top':    pos.top,
+          'margin-left':   pos.left,
+          'margin-bottom': pos.bottom,
+          'margin-right':  pos.right,
+          'padding': s.offset.y + 'px ' + s.offset.x  + 'px',
+          'float': float,
+        });
+
+        $(help).find('.help-text').css({
+          "font-family":      s.font.family,
+          "font-weight":      s.font.weight,
+          "font-style":       s.font.style,
+          "text-decoration":  s.font.decoration,
+          "font-size":        s.font.size,
+          "color":            s.font.color,
+          "margin": '0',
+          "padding": '0',
+        });
+
+        if(data.arrow.direction == 'top' || data.arrow.direction == 'bottom')
+        {
+          $(help).css({
+            'left': '',
+            'right': '',
+            'width': '100%',
+            'text-align': 'center',
+          });
+        }
+
+        if(data.arrow.direction == 'left' || data.arrow.direction == 'right')
+        {
+          $(help).css({
+            'float': data.arrow.direction,
+          });
+        }
+
+        return $(help);
+      },
+      attach: function(items) {
+        $(items.container).append(items.arrow);       // Attach our arrow to our help container
+        $(items.container).append(items.text);        // Attach our text to our help container
+        $(priv.container).prepend(items.container);  // Attach our help container to our parent DOM object
+      },
+      button: function()
+      {
+        if($("#"+settings.id+"-actiondiv").length == 0)
+        {
+          var btnDiv = document.createElement('div');
+          btnDiv.id=settings.id + '-actiondiv';
+
+          $(btnDiv).css({
+            'width': settings.button.size.x + 'px',
+            'height': settings.button.size.y + 'px',
+            'position': 'absolute',
+            'pointer-events': 'all',
+            'margin': 'auto auto'
+            });
+
+          switch(settings.button.position)
+          {
+            case 'top':
+              $(btnDiv).css({
+                'top': settings.button.offset.y+'px',
+                'bottom': 'auto',
+                'left': '0',
+                'right': '0',
+              });
+              break;
+
+            case 'topleft':
+              $(btnDiv).css({
+                'top': settings.button.offset.y+'px',
+                'bottom': 'auto',
+                'left': settings.button.offset.x+'px',
+                'right': 'auto',
+              });
+              break;
+
+            case 'topright':
+              $(btnDiv).css({
+                'top': settings.button.offset.y+'px',
+                'bottom': 'auto',
+                'left': 'auto',
+                'right': settings.button.offset.x+'px',
+              });
+              break;
+
+            case 'bottom':
+              $(btnDiv).css({
+                'top': 'auto',
+                'bottom': settings.button.offset.y+'px',
+                'left': '0',
+                'right': '0',
+              });
+              break;
+
+            case 'bottomleft':
+              $(btnDiv).css({
+                'top': 'auto',
+                'bottom': settings.button.offset.y+'px',
+                'left': settings.button.offset.x+'px',
+                'right': 'auto',
+              });
+              break;
+
+            case 'bottomright':
+              $(btnDiv).css({
+                'top': 'auto',
+                'bottom': settings.button.offset.y+'px',
+                'left': 'auto',
+                'right': settings.button.offset.x+'px',
+              });
+              break;
+
+            case 'left':
+              $(btnDiv).css({
+                'top': '0',
+                'bottom': '0',
+                'left': settings.button.offset.x+'px',
+                'right': 'auto',
+              });
+              break;
+
+            case 'right':
+              $(btnDiv).css({
+                'top': '0',
+                'bottom': '0',
+                'left': 'auto',
+                'right': settings.button.offset.x+'px',
+            });
+            break;
+
+            case 'center':
+              $(btnDiv).css({
+                'top': '0',
+                'bottom': '0',
+                'left': '0',
+                'right': '0',
+            });
+            break;
+          }
+
+          $(btnDiv).html('<button id="'+settings.id+'-action">'+settings.button.text+'</button>');
+
+          $(btnDiv).find('#'+settings.id+'-action').css({
+            'width': settings.button.size.x + 'px',
+            'height': settings.button.size.y + 'px',
+            "font-family":      settings.button.font.family,
+            "font-weight":      settings.button.font.weight,
+            "font-style":       settings.button.font.style,
+            "text-decoration":  settings.button.font.decoration,
+            "font-size":        settings.button.font.size,
+            "margin": '0',
+            "padding": '0',
+            "background-color": 'rgba('+settings.button.background.join(',')+')',
+            'cursor': 'pointer',
+          }).css(settings.button.style);
+
+          $(priv.container).append(btnDiv);
+
+          $("#"+settings.id+"-action").on('click', function() {
+            console.log('button clicked');
+            $(document).trigger('helpoverlay-buttonclicked', [settings.id]);
+          });
+        }
+      }
     }
 
-    /* Style generator */
     priv.styles = {
       build: function() {
-        priv.styles.add(".spot-result", {
-          "font-family":      settings.font.family,
-          "font-weight":      settings.font.weight,
-          "font-style":       settings.font.style,
-          "text-decoration":  settings.font.decoration,
-          "font-size":        settings.font.size,
-          "color":            settings.font.color,
-          "line-height":      settings.font.lineheight,
-          "text-shadow":      settings.font.shadow,
-          "background-image": 'url('+settings.Resources+settings.LinkImage+')',
-          "background-repeat": "no-repeat",
-          "padding": "0px 0 0 32px",
-          "background-position": "0px",
-          "background-size": "contain",
-        });
-
         priv.styles.generate();
       },
       add: function(identifier, rule) {
         if(priv.CSS[identifier] == null) { priv.CSS[identifier] = {}; }
         $.extend(priv.CSS[identifier], rule);
       },
-      generate: function() {
+      generate: function(obj) {
         var rules = "";
-        $.each(priv.CSS, function(id, props)
+        if(obj == undefined) { rules = priv.CSS; }
+
+        $.each(obj, function(id, props)
         {
           rules += id + " {\n";
           $.each(props, function(property, rule) {
@@ -234,10 +491,29 @@ var plugin_helpOverlay = (plugin_helpOverlay !== undefined ? plugin_helpOverlay 
           });
           rules += "}\n\n";
         });
-        if($('style#helpoverlay').length == 0) { $("head").append("<style id='helpoverlay'></style>"); }
-        $("style#helpoverlay").append(rules);
-      }
+        if($('style#'+settings.id).length == 0) { $("head").append("<style id='"+settings.id+"'></style>"); }
+        $("style#"+settings.id).append(rules);
+      },
+      attach: function(identifier, rule)
+      {
+        var obj = {}; obj[identifier] = rule;
+        priv.styles.generate(obj);
+      },
+      mobile: function(identifier, rule)
+      {
+        var query = '@media (max-width: 760px) {\n';
+        if($('style#'+settings.id).length == 0) { $("head").append("<style id='"+settings.id+"'></style>"); }
+
+        query += identifier + " {\n";
+        $.each(rule, function(property, r) {
+          query += "\t"+property+":"+r+";\n";
+        });
+        query += "}\n}\n\n";
+
+        $("style#"+settings.id).append(query);
+      },
     };
+
     return pub;
   }
 
@@ -252,7 +528,7 @@ var plugin_helpOverlay = (plugin_helpOverlay !== undefined ? plugin_helpOverlay 
         if(props == undefined) { props = {}; }
         if(!props.hasOwnProperty('id')) { props = $.extend(true, props, {'id':id}); }
         var p = new plugin(props);
-        items[id] = p; return p;
+        items[id] = p; if(p.hasOwnProperty('_construct')) { if(typeof p._construct == 'function') { p._construct(); } } return p;
       }
     }
 

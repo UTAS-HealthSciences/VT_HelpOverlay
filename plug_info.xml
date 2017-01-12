@@ -1,5 +1,5 @@
 <plugin id="HelpOverlay"
-        category="tr:UTAS"
+        category="tr:Help"
         name="tr:Help Overlay"
         version="1.0"
         isGraphical="true"
@@ -24,34 +24,7 @@
             </row>
           </group>
 
-          <group id="g_helpspots" name="tr: Help Spots">
-            <elementlist id="information">
-              <group id="g_info_item">
-                <group id="g_arrowSettings" name="tr: Arrow Position">
-                  <row id="r_arrowDirection">
-                    <position id="itemPosition"
-                              name="tr:Position"
-                              availableValues="topleft,topright,bottomleft,bottomright,bottom,top,left,right"
-                              default="bottom"
-                              x="0" y="0"/>
-                  </row>
-                </group>
-                <group id="g_textSettings" name="tr: Text Settings">
-                  <row id="r_textInput">
-                    <string id="help" name="tr: Help text" />
-                  </row>
-                  <row id="r_fontSettings">
-                    <font id="font" name="tr: Font" default="Calibri" size="20" style="normal" />
-                  </row>
-                  <row id="r_color">
-                    <color id="fontcolor" name="tr: Font Colour" default="#000" needalpha="true" defaultalpha="1.0" />
-                  </row>
-                </group>
-              </group>
-            </elementlist>
-          </group>
-
-          <group id="g_startbutton" name="tr: Continue Action">
+          <group id="g_startbutton" name="tr: Button">
             <row id="r_btnPos">
               <position id="buttonPosition"
                         name="tr:Button Position"
@@ -59,8 +32,16 @@
                         default="center"
                         x="0" y="0"/>
             </row>
+            <row id="r_buttonFont">
+              <font id="font" name="tr: Font" default="Calibri" size="20" style="normal" />
+            </row>
             <row id="r_buttonText">
               <string id="btnTxt" name="tr: Button Text" default="Start"/>
+            </row>
+            <row id="r_btnSize">
+              <label id="buttonSizeLabel" name="tr: Box Size:"/>
+              <number id="buttonSizeX" minimum="0" suffix="px wide" />
+              <number id="buttonSizeY" minimum="0" suffix="px high" />
             </row>
           </group>
         </parameters>
@@ -73,6 +54,7 @@
         </templates>
 
         <resources>
+          <file url="arrow.png" />
         </resources>
 
 </plugin>

@@ -1,5 +1,14 @@
 <ptplugin name="{{p.id}}" engine="helpOverlay">
 	<settings>
+		<option name="help_hijack" value="{{p.hijack.value}}" type="bool" />
+		{% if p.helpIcon.fileName %}
+			<option name="help_icon" value="%FIRSTXML%/{{pluginDirectory}}/{{p.helpIcon.fileName}}" type="string" />
+		{% else %}
+			<option name="help_icon" value="" type="string" />
+		{% endif %}
+		<option name="help_onstart" value='{{p.showonstart.value}}' type='bool' />
+		<option name="greeting" value='{{p.helpNameText.value}}' type='string' />
+
 		<option name="button_position" value="{{p.buttonPosition.positionString}}" type="string" />
 		<option name="button_offsetX" value="{{p.buttonPosition.x}}" type="int" />
 		<option name="button_offsetY" value="{{p.buttonPosition.y}}" type="int" />

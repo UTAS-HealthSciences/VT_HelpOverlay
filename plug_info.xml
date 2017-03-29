@@ -16,8 +16,7 @@
               <bool id="hijack" name="tr: Hijack existing Help Info panel?" default="true"/>
             </row>
                 <row id="r_controlbaricon">
-                </row>
-                <row id="r_controlbarposition">
+                  <filechooser id="helpIcon" name="tr: Help Image" filters="images" allowRemote="false" />
                 </row>
             <row id="r_showonstart">
               <bool id="showonstart" name="tr: Show help screen when tour starts?" default="true" />

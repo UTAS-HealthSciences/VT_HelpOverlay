@@ -4,551 +4,656 @@
 * Date: 24 November 2016
 */
 
+String.prototype.width = function(font) {
+  console.log(font);
+  var f = font || '12px arial',
+     o = $('<div>' + this + '</div>')
+         .css({'position': 'absolute', 'float': 'left', 'white-space': 'nowrap', 'visibility': 'hidden', 'font': f})
+         .appendTo($('body')),
+     w = o.width();
+
+  o.remove();
+
+  return w;
+}
+
 var plugin_helpOverlay = (plugin_helpOverlay !== undefined ? plugin_helpOverlay : (function( $ , undefined ) {
   function plugin(args) {
-    var pub = {}; //Public facing functions and variables.
-    var priv = {
-      children: [], //Formatted HTML objects that have been attached to the DOM.
-      items: [], //Raw content provided by the other plugins when they register
-    }; //Helper container to hold known-private variables.
+   var pub = {}; //Public facing functions and variables.
+   var priv = {
+     children: [], //Formatted HTML objects that have been attached to the DOM.
+     items: [], //Raw content provided by the other plugins when they register
 
-    priv.CSS = {};
+     //Plugin layer names with helper handles.
+     helpNames: {
+      open: 'btn_display_help',
+      close: 'btn_close_help',
+     },
+   }; //Helper container to hold known-private variables.
 
-    var settings = {};
-    var defaults = {
-      id: '',   //Plugin ID
-    }
+   priv.CSS = {};
 
-    //Add our defaults and overrides to our primary settings object.
-    settings = $.extend(true, {}, defaults, args);
+   var settings = {};
+   var defaults = {
+     id: '',   //Plugin ID
+     help: {
+      icon: '',
+     }
+   }
 
-    //If the item has no id, then break the creation and close code.
-    if(settings.id == '')
-    {
-      console.error("Invalid ID set.");
-      return false;
-    }
+   //Add our defaults and overrides to our primary settings object.
+   settings = $.extend(true, {}, defaults, args);
 
-    /**
-     * Identifies the version of the plugin
-     * @type {Number}
-     */
-    pub.version = 0.01;
+   //If the item has no id, then break the creation and close code.
+   if(settings.id == '')
+   {
+     console.error("Invalid ID set.");
+     return false;
+   }
+
+   /**
+    * Identifies the version of the plugin
+    * @type {Number}
+    */
+   pub.version = 0.01;
 
 
    /*******************************
-    *       PUBLIC FUNCTIONS      *
+   *      PUBLIC FUNCTIONS     *
+   *******************************/
+
+   /**
+    * Constructor function
+    * @author cdeckers
+    * @version [version]
+    * @date   2017-01-11
+    * @return  {void}
+    */
+   pub._construct = function()
+   {
+     priv.build(); //Build container
+     priv.builder.button(); //Build onscreen button
+     if(settings.help.hijack) {priv.hijack();} //Call our hijack function
+     priv.visible = settings.help.onstart; //Is it visible when the tour starts?
+     pub.display(settings.help.onstart); //Should it be shown on tour start?
+   }
+
+   /**
+    * Helper function to toggle the display state of the help overlay.
+    * @author cdeckers
+    * @version 1
+    * @date   2017-02-09
+    * @return  {void}
+    */
+   pub.toggleHelp = function() {
+     pub.display(!priv.visible); //Set the display state to whatever it currently is not.
+   }
+
+   //Set the display state to a specific state.
+   pub.display = function(state) {
+     pub.visible(state);   // Set the containers visibility
+     pub.helpState(state); // If the help icon is visible in the Control DBar, sets whether it should say "Open" or "Close"
+     priv.visible = state; // Sets the internal visibility state.
+   }
+
+   //Controls the current state of the Help icon in the Control DBar.
+   pub.helpState = function(state)
+   {
+     krpano.set('plugin['+settings.pluginname+priv.helpNames.open+'].visible', !state);
+     krpano.set('plugin['+settings.pluginname+priv.helpNames.close+'].visible', state);
+   }
+
+   /**
+    * Registers an item with the parent Help Overlay plugin.
+    * @author cdeckers
+    * @version [version]
+    * @date   2017-01-11
+    * @param   {[type]}   item [description]
+    * @return  {[type]}      [description]
+    */
+   pub.register = function(item)
+   {
+     priv.items.push(item); //Adds the item to our stack.
+     priv.draw(item); //Draw the item to the screen.
+   }
+
+   /**
+    * Fires a callback for each child of the plugin.
+    * @author cdeckers
+    * @version [version]
+    * @date   2017-01-11
+    * @param   {Function} callback [description]
+    * @return  {[type]}         [description]
+    */
+   pub.items = function(callback)
+   {
+     if(typeof callback != 'function') { console.error("Callback needs to be a function. Type is " + typeof callback); return false; } //Check that the callback is a function.
+     return $.each(priv.children, function(k,v) { callback.apply(this, [$(v)]); }); //Loop through each item and fire our callback for each one.
+   }
+
+   /**
+    * Sets the visiblity of the help elements and the overlay.
+    * @author cdeckers
+    * @version [version]
+    * @date   2017-01-11
+    * @param   {bool}   visible Desired visiblity state of the container
+    * @return  {bool}         Whether the container is displaying as a block.
+    */
+   pub.visible = function(visible)
+   {
+     $(priv.container).css('display', visible?'block':'none'); //Set whether the container should display as a block, or none.
+     return $(priv.container).css('display') == 'block'; //Returns whether the container is displaying as a block.
+   }
+
+
+   /*******************************
+    *     PRIVATE FUNCTIONS     *
     *******************************/
+   //Builder helper function
+   priv.build = function()
+   {
+     priv.container = priv.builder.container(); //Build our container to the screen and assign its handle to a container variable.
+   }
 
-    /**
-     * Constructor function
-     * @author cdeckers
-     * @version [version]
-     * @date    2017-01-11
-     * @return  {void}
-     */
-    pub._construct = function()
-    {
-      priv.build();
-      priv.builder.button();
-    }
+   //Item draw helper
+   priv.draw = function(item)
+   {
+     var obj = {};
+     obj.container = priv.builder.item(item); //Build the items container.
+     obj.arrow = priv.builder.arrow(item); //Build the arrow
+     obj.text = priv.builder.text(item); //Build the text element.
+     priv.builder.attach(obj); //Attach these elements to the DOM.
+     priv.children.push(obj); //Add our finished object to the stack.
+   }
 
-    /**
-     * Registers an item with the parent Help Overlay plugin.
-     * @author cdeckers
-     * @version [version]
-     * @date    2017-01-11
-     * @param   {[type]}   item [description]
-     * @return  {[type]}        [description]
-     */
-    pub.register = function(item)
-    {
-      //Adds the item to our stack.
-      priv.items.push(item);
+   //I don't like how tied into the plugin this is, but it doesn't matter.
+   //This plugin content won't be used outside of Panotour / KRPano, so it doesn't matter.
+   priv.hijack = function()
+   {
+     if(typeof krpano == 'undefined') { krpano = document.getElementByID("#panoDIV"); }
+     //Get a list of all plugins in the tour.
+     settings.pluginname = 'controlbar_dpad';
 
-      //Draw the item to the screen.
-      priv.draw(item);
-    }
-
-    /**
-     * Fires a callback for each child of the plugin.
-     * @author cdeckers
-     * @version [version]
-     * @date    2017-01-11
-     * @param   {Function} callback [description]
-     * @return  {[type]}            [description]
-     */
-    pub.items = function(callback)
-    {
-      //Check that the callback is a function.
-      if(typeof callback != 'function') { console.error("Callback needs to be a function. Type is " + typeof callback); return false; }
-
-      //Loop through each item and fire our callback for each one.
-      return $.each(priv.children, function(k,v) { callback.apply(this, [$(v)]); });
-    }
-
-    /**
-     * Sets the visiblity of the help elements and the overlay.
-     * @author cdeckers
-     * @version [version]
-     * @date    2017-01-11
-     * @param   {[type]}   visible [description]
-     * @return  {[type]}           [description]
-     */
-    pub.visible = function(visible)
-    {
-      $(priv.container).css('display', visible?'block':'none');
-      return $(priv.container).css('display') == 'block';
-    }
-
-
-    /*******************************
-     *      PRIVATE FUNCTIONS      *
-     *******************************/
-
-    priv.build = function()
-    {
-      priv.container = priv.builder.container();
-    };
-
-    priv.draw = function(item)
-    {
-      var obj = {};
-      //Build the items container.
-      obj.container = priv.builder.item(item);
-
-      //Build the arrow
-      obj.arrow = priv.builder.arrow(item);
-
-      //Build the text element.
-      obj.text = priv.builder.text(item);
-
-      //Attach these elements to the DOM.
-      priv.builder.attach(obj);
-
-      //Add our finished object to the stack.
-      priv.children.push(obj);
-    }
-
-    priv.cardinalPadding = 10;
-
-    priv.builder = {
-      container: function() {
-        if($('#'+settings.id).length === 0)
-        {
-          var textElem = document.createElement('div');
-          textElem.id = settings.id;
-
-          $(settings.parent).prepend(textElem);
-
-          $(textElem).css({
-              'position': 'absolute',
-              'z-index': '5000',
-              'overflow': 'hidden',
-              'pointer-events': 'all',
-              'background': 'rgba(255,255,255,0.25)',
-              'cursor': 'default',
-              'width': '100%',
-              'height': '100%',
-            });
-        }
-        return $('#'+settings.id);
-      },
-      item: function(data) {
-        var s = data.container;
-        var pos = { top: 'auto', left: 'auto', right: 'auto', bottom: 'auto', };
-        var paddingFix = {};
-
-        var origin = [];
-
-        if(s.position.indexOf("top") > -1) { pos.top = 0; origin.push('top') }
-        if(s.position.indexOf("left") > -1) { pos.left = 0; origin.push('left') }
-        if(s.position.indexOf("bottom") > -1) { pos.bottom = 0; origin.push('bottom') }
-        if(s.position.indexOf("right") > -1) { pos.right = 0; origin.push('right') }
-
-        var helpDiv = document.createElement('div');
-        helpDiv.id = s.id;
-        helpDiv.className = 'help-item-container';
-
-        if(data.arrow.direction == 'top' || data.arrow.direction == 'right' || data.arrow.direction == 'bottom' || data.arrow.direction == 'left')
-        {
-          paddingFix['padding-'+data.arrow.direction] = 0;
-        }
-
-        $(helpDiv).css({
-            'top':    pos.top,
-            'left':   pos.left,
-            'bottom': pos.bottom,
-            'right':  pos.right,
-            'position': 'absolute',
-            'max-width':  s.size.x + 'px',
-            'max-height': s.size.y + 'px',
-            'border': 'thin black solid',
-            'border-radius': '3px',
-            'margin': s.offset.y + 'px ' + s.offset.x + 'px ' + s.offset.y + 'px ' + s.offset.x + 'px',
-            'background-color': 'rgba(' + s.background.join(',') + ')',
-            'padding': s.padding.y + 'px ' + s.padding.x + 'px',
-          });
-
-          $(helpDiv).css(paddingFix);
-
-          priv.styles.mobile('#'+s.id, {
-            'transform-origin': origin.join(' '),
-            'transform': 'scale(0.6)',
-          });
-
-          return $(helpDiv);
-      },
-      arrow: function(data) {
-        var s = data.arrow;
-
-        var rotation = {
-          'topleft': -45,
-          'top': 0,
-          'topright': 45,
-          'left': -90,
-          'bottomleft': -135,
-          'bottom': 180,
-          'bottomright': 135,
-          'right': 90,
-        };
-
-        var float = '';
-        var arrowpos = { top: 'auto', left: 'auto', right: 'auto', bottom: 'auto', };
-        if(s.position.indexOf("top") > -1) { arrowpos.top = s.offset.y;}
-        if(s.position.indexOf("left") > -1) { arrowpos.left = s.offset.x; float = 'left'; }
-        if(s.position.indexOf("bottom") > -1) { arrowpos.bottom = s.offset.y; }
-        if(s.position.indexOf("right") > -1) { arrowpos.right = s.offset.x; float = 'right'; }
-
-        switch(s.position)
-        {
-          case 'top':
-          case 'bottom':
-            arrowpos.left = s.offset.x;
-            arrowpos.right = s.offset.x;
-            break;
-          case 'left':
-          case 'right':
-            arrowpos.top = s.offset.y;
-            arrowpos.bottom = s.offset.y;
-            break;
-        }
-
-        var margin = {};  var spacing = 0;
-        var cardinalPadding = 10;
-        var cardinals = ['top', 'left', 'bottom', 'right'];
-        if(cardinals.indexOf(s.direction) > -1)
-        {
-          arrowpos[s.direction] += cardinalPadding;
-          spacing = cardinalPadding;
-        }
-
-        var arrow = document.createElement('div');
-        arrow.id=s.id+'_arrow'; arrow.className = "arrow";
-
-        $(arrow).css({
-          position: 'relative',
-          width:    s.size.x + 'px',
-          height:   s.size.y + 'px',
-          'top':    arrowpos.top == 'auto' ? 'auto' : arrowpos.top + 'px',
-          'left':   arrowpos.lef == 'auto' ? 'auto' : arrowpos.left + 'px',
-          'bottom': arrowpos.bottom == 'auto' ? 'auto' : arrowpos.bottom + 'px',
-          'right':  arrowpos.right == 'auto' ? 'auto' : arrowpos.right + 'px',
-          'margin': 'auto',
-          'float': float,
-        });
-
-        //Stores our arrow position so that we can retrieve it for the text without recaluclating.
-        priv.arrow = priv.arrow || {};
-        priv.arrow[s.id] = priv.arrow[s.id] || {};
-        priv.arrow[s.id].arrowpos = arrowpos;
-        priv.arrow[s.id].padding = cardinalPadding;
-
-        priv.styles.attach('#'+s.id+'_arrow:before', {
-          'content': '""',
-          'position': 'absolute',
-          'width': '100%',
-          'height': '100%',
-          'z-index': '0',
-          'background': 'url('+s.image+') center center no-repeat',
-          'background-size': 'contain',
-          '-webkit-transform': 'rotate('+rotation[s.direction]+'deg)',
-          '-moz-transform': 'rotate('+rotation[s.direction]+'deg)',
-          '-ms-transform': 'rotate('+rotation[s.direction]+'deg)',
-          '-o-transform': 'rotate('+rotation[s.direction]+'deg)',
-          'transform': 'rotate('+rotation[s.direction]+'deg)',
-        });
-
-        priv.styles.attach('#'+s.id+'_arrow:before', margin);
-
-        return $(arrow);
-      },
-      text: function(data) {
-        var s = data.text;
-
-        var help = document.createElement('div'); help.id=s.id+'_help'; help.className='help-text-container';
-        $(help).html('<p class="help-text">'+s.content+'</p>');
-
-        var pos = priv.arrow[s.id].arrowpos;
-        var apad = priv.arrow[s.id].padding;
-
-        if(pos.top != 'auto' && data.arrow.direction == 'top') { pos.top = apad + 'px'; }
-        if(pos.bottom != 'auto' && data.arrow.direction == 'bottom') { pos.bottom = apad + 'px'; }
-        if(pos.left != 'auto' && data.arrow.direction == 'left') { pos.left = apad + 'px'; }
-        if(pos.right != 'auto' && data.arrow.direction == 'right') { pos.right = apad + 'px'; }
-
-        var float = '';
-        if(data.arrow.position.indexOf('left')) { float = 'right'; }
-        if(data.arrow.position.indexOf('right')) { float = 'left'; }
-
-        $(help).css({
-          'position': 'relative',
-          'margin-top':    pos.top,
-          'margin-left':   pos.left,
-          'margin-bottom': pos.bottom,
-          'margin-right':  pos.right,
-          'padding': s.offset.y + 'px ' + s.offset.x  + 'px',
-          'float': float,
-        });
-
-        $(help).find('.help-text').css({
-          "font-family":      s.font.family,
-          "font-weight":      s.font.weight,
-          "font-style":       s.font.style,
-          "text-decoration":  s.font.decoration,
-          "font-size":        s.font.size,
-          "color":            s.font.color,
-          "margin": '0',
-          "padding": '0',
-        });
-
-        if(data.arrow.direction == 'top' || data.arrow.direction == 'bottom')
-        {
-          $(help).css({
-            'left': '',
-            'right': '',
-            'width': '100%',
-            'text-align': 'center',
-          });
-        }
-
-        if(data.arrow.direction == 'left' || data.arrow.direction == 'right')
-        {
-          $(help).css({
-            'float': data.arrow.direction,
-          });
-        }
-
-        return $(help);
-      },
-      attach: function(items) {
-        $(items.container).append(items.arrow);       // Attach our arrow to our help container
-        $(items.container).append(items.text);        // Attach our text to our help container
-        $(priv.container).prepend(items.container);  // Attach our help container to our parent DOM object
-      },
-      button: function()
+     //As long as our plugin name isn't empty, we know we found something.
+     if(settings.pluginname != '')
+     {
+      if(settings.help.icon != '')
       {
-        if($("#"+settings.id+"-actiondiv").length == 0)
-        {
-          var btnDiv = document.createElement('div');
-          btnDiv.id=settings.id + '-actiondiv';
-
-          $(btnDiv).css({
-            'width': settings.button.size.x + 'px',
-            'height': settings.button.size.y + 'px',
-            'position': 'absolute',
-            'pointer-events': 'all',
-            'margin': 'auto auto'
-            });
-
-          switch(settings.button.position)
-          {
-            case 'top':
-              $(btnDiv).css({
-                'top': settings.button.offset.y+'px',
-                'bottom': 'auto',
-                'left': '0',
-                'right': '0',
-              });
-              break;
-
-            case 'topleft':
-              $(btnDiv).css({
-                'top': settings.button.offset.y+'px',
-                'bottom': 'auto',
-                'left': settings.button.offset.x+'px',
-                'right': 'auto',
-              });
-              break;
-
-            case 'topright':
-              $(btnDiv).css({
-                'top': settings.button.offset.y+'px',
-                'bottom': 'auto',
-                'left': 'auto',
-                'right': settings.button.offset.x+'px',
-              });
-              break;
-
-            case 'bottom':
-              $(btnDiv).css({
-                'top': 'auto',
-                'bottom': settings.button.offset.y+'px',
-                'left': '0',
-                'right': '0',
-              });
-              break;
-
-            case 'bottomleft':
-              $(btnDiv).css({
-                'top': 'auto',
-                'bottom': settings.button.offset.y+'px',
-                'left': settings.button.offset.x+'px',
-                'right': 'auto',
-              });
-              break;
-
-            case 'bottomright':
-              $(btnDiv).css({
-                'top': 'auto',
-                'bottom': settings.button.offset.y+'px',
-                'left': 'auto',
-                'right': settings.button.offset.x+'px',
-              });
-              break;
-
-            case 'left':
-              $(btnDiv).css({
-                'top': '0',
-                'bottom': '0',
-                'left': settings.button.offset.x+'px',
-                'right': 'auto',
-              });
-              break;
-
-            case 'right':
-              $(btnDiv).css({
-                'top': '0',
-                'bottom': '0',
-                'left': 'auto',
-                'right': settings.button.offset.x+'px',
-            });
-            break;
-
-            case 'center':
-              $(btnDiv).css({
-                'top': '0',
-                'bottom': '0',
-                'left': '0',
-                'right': '0',
-            });
-            break;
-          }
-
-          $(btnDiv).html('<button id="'+settings.id+'-action">'+settings.button.text+'</button>');
-
-          $(btnDiv).find('#'+settings.id+'-action').css({
-            'width': settings.button.size.x + 'px',
-            'height': settings.button.size.y + 'px',
-            "font-family":      settings.button.font.family,
-            "font-weight":      settings.button.font.weight,
-            "font-style":       settings.button.font.style,
-            "text-decoration":  settings.button.font.decoration,
-            "font-size":        settings.button.font.size,
-            "margin": '0',
-            "padding": '0',
-            "background-color": 'rgba('+settings.button.background.join(',')+')',
-            'cursor': 'pointer',
-          }).css(settings.button.style);
-
-          $(priv.container).append(btnDiv);
-
-          $("#"+settings.id+"-action").on('click', function() {
-            console.log('button clicked');
-            $(document).trigger('helpoverlay-buttonclicked', [settings.id]);
-          });
-        }
+        krpano.set('plugin['+settings.pluginname+priv.helpNames.open+'].url', settings.help.icon);
+        krpano.set('plugin['+settings.pluginname+priv.helpNames.close+'].url', settings.help.icon);
       }
-    }
+      krpano.set('plugin['+settings.pluginname+priv.helpNames.open+'].onclick', 'jsFireEvent("pano_helpOpened", "'+settings.pluginname+'");');
+      krpano.set('plugin['+settings.pluginname+priv.helpNames.close+'].onclick', 'jsFireEvent("pano_helpClosed", "'+settings.pluginname+'");');
+     }
+   }
 
-    priv.styles = {
-      build: function() {
-        priv.styles.generate();
-      },
-      add: function(identifier, rule) {
-        if(priv.CSS[identifier] == null) { priv.CSS[identifier] = {}; }
-        $.extend(priv.CSS[identifier], rule);
-      },
-      generate: function(obj) {
-        var rules = "";
-        if(obj == undefined) { rules = priv.CSS; }
 
-        $.each(obj, function(id, props)
+   //How much padding should be attached to top, bottom, left or right, only if the arrow is pointing in those directions.
+   priv.cardinalPadding = 10;
+
+   //Builder object
+   priv.builder = {
+     //Build the container
+     container: function() {
+      //Test that the container doesn't exist in our DOM yet.
+      if($('#'+settings.id).length === 0)
+      {
+        var textElem = document.createElement('div'); //Generate and element
+        textElem.id = settings.id; //Set the elements ID
+        $(settings.parent).prepend(textElem); //Attach the element to our parents DOM
+
+        //Set the elements CSS styling
+        $(textElem).css({
+           'position': 'absolute',
+           'z-index': '5000',
+           'overflow': 'hidden',
+           'pointer-events': 'all',
+           'background': 'rgba(255,255,255,0.25)',
+           'cursor': 'default',
+           'width': '100%',
+           'height': '100%',
+         });
+      }
+      //Return the container object.
+      return $('#'+settings.id);
+     },
+     //Build an item
+     item: function(data) {
+      var s = data.container; //Get the container
+      var pos = { top: 'auto', left: 'auto', right: 'auto', bottom: 'auto', }; //Set the margin positioning.
+      var paddingFix = {}; var origin = []; // Padding fix is to implement the cardinalPadding; origin is to learn it's location
+
+      if(s.position.indexOf("top") > -1) { pos.top = 0; origin.push('top') } //If the location has 'top' in it, we know that it has to be aligned towards the top.
+      if(s.position.indexOf("left") > -1) { pos.left = 0; origin.push('left') } //If the location has 'left' in it, we know that it has to be aligned towards the left.
+      if(s.position.indexOf("bottom") > -1) { pos.bottom = 0; origin.push('bottom') } //If the location has 'bottom' in it, we know that it has to be aligned towards the bottom.
+      if(s.position.indexOf("right") > -1) { pos.right = 0; origin.push('right') } //If the location has 'right' in it, we know that it has to be aligned towards the right.
+
+      var helpDiv = document.createElement('div'); //Create an element for our info box.
+      helpDiv.id = s.id; //Give our element an identity. (heh).
+      helpDiv.className = 'help-item-container'; //Give our element some class. (also heh).
+
+      if(data.arrow.direction == 'top' || data.arrow.direction == 'right' || data.arrow.direction == 'bottom' || data.arrow.direction == 'left') //If the arrow is pointing in a cardinal direction
+      {
+        paddingFix['padding-'+data.arrow.direction] = 0; //Adjust the padding appropriately.
+      }
+
+      //Set the CSS of the info element
+      $(helpDiv).css({
+         'top':   pos.top,
+         'left':   pos.left,
+         'bottom': pos.bottom,
+         'right':  pos.right,
+         'position': 'absolute',
+         'max-width':  s.size.x + 'px',
+         'max-height': s.size.y + 'px',
+         'border': 'thin black solid',
+         'border-radius': '3px',
+         'margin': s.offset.y + 'px ' + s.offset.x + 'px ' + s.offset.y + 'px ' + s.offset.x + 'px',
+         'background-color': 'rgba(' + s.background.join(',') + ')',
+         'padding': s.padding.y + 'px ' + s.padding.x + 'px',
+        });
+
+        //Apply our padding fix.
+        $(helpDiv).css(paddingFix);
+
+        //Add some styles to our 'mobile' media query.
+        priv.styles.mobile('#'+s.id, {
+         'transform-origin': origin.join(' '),
+         'transform': 'scale(0.6)',
+        });
+        //Return out our info div element.
+        return $(helpDiv);
+     },
+     //Buld an arrow
+     arrow: function(data) {
+      var s = data.arrow; //Get a shorthand var out of our data.
+
+      //Set what our rotation should be, based upon it's direction.
+      var rotation = {
+        'topleft': -45,
+        'top': 0,
+        'topright': 45,
+        'left': -90,
+        'bottomleft': -135,
+        'bottom': 180,
+        'bottomright': 135,
+        'right': 90,
+      };
+
+      var float = ''; //A float handle, for deciding where it should sit inside the container.
+      var arrowpos = { top: 'auto', left: 'auto', right: 'auto', bottom: 'auto', }; //Arrow location inside the container
+      if(s.position.indexOf("top") > -1) { arrowpos.top = s.offset.y;} //If the position contains 'top', align to the decided offset.
+      if(s.position.indexOf("left") > -1) { arrowpos.left = s.offset.x; float = 'left'; } //If the position contains 'left', align to the decided offset, and float to the left.
+      if(s.position.indexOf("bottom") > -1) { arrowpos.bottom = s.offset.y; } //If the position contains 'bottom', align to the decided offset.
+      if(s.position.indexOf("right") > -1) { arrowpos.right = s.offset.x; float = 'right'; } //If the position contains 'right', align to the decided offset, and float to the left.
+
+      switch(s.position)
+      {
+        //If the position is either 'top' or 'bottom'
+        case 'top':
+        case 'bottom':
+         arrowpos.left = s.offset.x;
+         arrowpos.right = s.offset.x;
+         break;
+
+        //If the position is either 'left' or 'right'
+        case 'left':
+        case 'right':
+         arrowpos.top = s.offset.y;
+         arrowpos.bottom = s.offset.y;
+         break;
+      }
+
+      var spacing = 0; // Spacing will be set to anything other than zero is the arrow has been moved away from the edge because of cardinalPadding
+      var cardinalPadding = 10; // The padding to use if the arrow is pointing in a cardinal direction
+      var cardinals = ['top', 'left', 'bottom', 'right']; // A preset of the cardinal directions
+      if(cardinals.indexOf(s.direction) > -1) //If the arrow is pointing in a cardinal direction..
+      {
+        arrowpos[s.direction] += cardinalPadding; //Add some padding on that side
+        spacing = cardinalPadding; //Add the padding to our spacing var
+      }
+
+      var arrow = document.createElement('div'); //Create our arrow container element
+      arrow.id=s.id+'_arrow'; arrow.className = "arrow"; //Assign it a class and ID
+
+      //Give our arrow some styling
+      $(arrow).css({
+        position: 'relative',
+        width:   s.size.x + 'px',
+        height:   s.size.y + 'px',
+        'top':   arrowpos.top == 'auto' ? 'auto' : arrowpos.top + 'px',
+        'left':   arrowpos.lef == 'auto' ? 'auto' : arrowpos.left + 'px',
+        'bottom': arrowpos.bottom == 'auto' ? 'auto' : arrowpos.bottom + 'px',
+        'right':  arrowpos.right == 'auto' ? 'auto' : arrowpos.right + 'px',
+        'margin': 'auto',
+        'float': float,
+      });
+
+      //Stores our arrow position so that we can retrieve it for the text without recaluclating.
+      priv.arrow = priv.arrow || {};
+      priv.arrow[s.id] = priv.arrow[s.id] || {};
+      priv.arrow[s.id].arrowpos = arrowpos;
+      priv.arrow[s.id].padding = cardinalPadding;
+
+      //Attach some styling to our stylesheet for our arrow.
+      priv.styles.attach('#'+s.id+'_arrow:before', {
+        'content': '""',
+        'position': 'absolute',
+        'width': '100%',
+        'height': '100%',
+        'z-index': '0',
+        'background': 'url('+s.image+') center center no-repeat',
+        'background-size': 'contain',
+        '-webkit-transform': 'rotate('+rotation[s.direction]+'deg)',
+        '-moz-transform': 'rotate('+rotation[s.direction]+'deg)',
+        '-ms-transform': 'rotate('+rotation[s.direction]+'deg)',
+        '-o-transform': 'rotate('+rotation[s.direction]+'deg)',
+        'transform': 'rotate('+rotation[s.direction]+'deg)',
+      });
+      // Return our element
+      return $(arrow);
+     },
+     //Insert the text
+     text: function(data) {
+      var s = data.text; //Get our shorthand var from our data
+      var help = document.createElement('div'); help.id=s.id+'_help'; help.className='help-text-container'; //Create our element, and give it a class and ID.
+      $(help).html('<p class="help-text">'+s.content+'</p>'); //Set the HTML of our text element
+
+      var pos = priv.arrow[s.id].arrowpos; //Set it to the position calculated by the arrow
+      var apad = priv.arrow[s.id].padding; //Give it some padding if our arrow was pointing in a cardinal direction
+
+      if(pos.top != 'auto' && data.arrow.direction == 'top') { pos.top = apad + 'px'; } //Add some padding if the arrow is pointing to the top
+      if(pos.bottom != 'auto' && data.arrow.direction == 'bottom') { pos.bottom = apad + 'px'; } //Add some padding if the arrow is pointing to the bottom
+      if(pos.left != 'auto' && data.arrow.direction == 'left') { pos.left = apad + 'px'; } //Add some padding if the arrow is pointing to the left
+      if(pos.right != 'auto' && data.arrow.direction == 'right') { pos.right = apad + 'px'; } //Add some padding if the arrow is pointing to the right
+
+      var float = ''; //Manage where the text should float in the parent container
+      if(data.arrow.position.indexOf('left')) { float = 'right'; } //If the arrow is floating left, float the text to the right
+      if(data.arrow.position.indexOf('right')) { float = 'left'; } //If the arrow is floating right, float the text to the left
+
+      //Give our text container some styling
+      $(help).css({
+        'position': 'relative',
+        'margin-top':   pos.top,
+        'margin-left':   pos.left,
+        'margin-bottom': pos.bottom,
+        'margin-right':  pos.right,
+        'padding': s.offset.y + 'px ' + s.offset.x  + 'px',
+        'float': float,
+      });
+
+      //Give our text element some styling
+      $(help).find('.help-text').css({
+        "font-family":     s.font.family,
+        "font-weight":     s.font.weight,
+        "font-style":      s.font.style,
+        "text-decoration":  s.font.decoration,
+        "font-size":      s.font.size,
+        "color":         s.font.color,
+        "margin": '0',
+        "padding": '0',
+      });
+
+      //If the arrow is facing either up or down, add some extra styling
+      if(data.arrow.direction == 'top' || data.arrow.direction == 'bottom')
+      {
+        //Make sure that the text aligns itself to be in the center of the container
+        $(help).css({
+         'left': '',
+         'right': '',
+         'width': '100%',
+         'text-align': 'center',
+        });
+      }
+
+      //If the arrow is facing either left or right, add some extra styling
+      if(data.arrow.direction == 'left' || data.arrow.direction == 'right')
+      {
+        //Make sure that the container is floating in the correct location.
+        $(help).css({
+         'float': data.arrow.direction,
+        });
+      }
+      //Return our help text container
+      return $(help);
+     },
+     //Helper function to attach elements to the DOM
+     attach: function(items) {
+      $(items.container).append(items.arrow);      // Attach our arrow to our help container
+      $(items.container).append(items.text);      // Attach our text to our help container
+      $(priv.container).prepend(items.container);  // Attach our help container to our parent DOM object
+     },
+     //Draw our button to the screen
+     button: function() {
+      //If the button hasn't been drawn to the screen yet
+      if($("#"+settings.id+"-actiondiv").length == 0)
+      {
+        var btnDiv = document.createElement('div'); //Create our button container
+        btnDiv.id=settings.id + '-actiondiv'; //Give it an ID
+
+        //Position it depending on where it should sit.
+        switch(settings.button.position)
         {
-          rules += id + " {\n";
-          $.each(props, function(property, rule) {
-            rules += "\t"+property+":"+rule+";\n";
-          });
-          rules += "}\n\n";
+         case 'top':
+           $(btnDiv).css({
+            'top': settings.button.offset.y+'px',
+            'bottom': 'auto',
+            'left': '0',
+            'right': '0',
+           });
+           break;
+
+         case 'topleft':
+           $(btnDiv).css({
+            'top': settings.button.offset.y+'px',
+            'bottom': 'auto',
+            'left': settings.button.offset.x+'px',
+            'right': 'auto',
+           });
+           break;
+
+         case 'topright':
+           $(btnDiv).css({
+            'top': settings.button.offset.y+'px',
+            'bottom': 'auto',
+            'left': 'auto',
+            'right': settings.button.offset.x+'px',
+           });
+           break;
+
+         case 'bottom':
+           $(btnDiv).css({
+            'top': 'auto',
+            'bottom': settings.button.offset.y+'px',
+            'left': '0',
+            'right': '0',
+           });
+           break;
+
+         case 'bottomleft':
+           $(btnDiv).css({
+            'top': 'auto',
+            'bottom': settings.button.offset.y+'px',
+            'left': settings.button.offset.x+'px',
+            'right': 'auto',
+           });
+           break;
+
+         case 'bottomright':
+           $(btnDiv).css({
+            'top': 'auto',
+            'bottom': settings.button.offset.y+'px',
+            'left': 'auto',
+            'right': settings.button.offset.x+'px',
+           });
+           break;
+
+         case 'left':
+           $(btnDiv).css({
+            'top': '0',
+            'bottom': '0',
+            'left': settings.button.offset.x+'px',
+            'right': 'auto',
+           });
+           break;
+
+         case 'right':
+           $(btnDiv).css({
+            'top': '0',
+            'bottom': '0',
+            'left': 'auto',
+            'right': settings.button.offset.x+'px',
+         });
+         break;
+
+         case 'center':
+           $(btnDiv).css({
+            'top': '0',
+            'bottom': '0',
+            'left': '0',
+            'right': '0',
+         });
+         break;
+        }
+
+        $(btnDiv).html('<button id="'+settings.id+'-action">'+settings.button.text+'</button>'); //Add our button HTML to our container
+        $(btnDiv).prepend('<p class="greeting-text">'+settings.help.greeting+'</p>'); //Prepend the greeting text to the container
+
+        //Apply some CSS to our button
+        $(btnDiv).find('#'+settings.id+'-action').css({
+         'width': settings.button.size.x + 'px',
+         'height': settings.button.size.y + 'px',
+         "font-family":     settings.button.font.family,
+         "font-weight":     settings.button.font.weight,
+         "font-style":      settings.button.font.style,
+         "text-decoration":  settings.button.font.decoration,
+         "font-size":      settings.button.font.size,
+         "margin": '0',
+         "padding": '0',
+         "background-color": 'rgba('+settings.button.background.join(',')+')',
+         'cursor': 'pointer',
+        }).css(settings.button.style); //This last line will append the CSS with any additions or overrides provided in our settings.
+
+        //Find the greeting text and apply some styling
+        $(btnDiv).find('.greeting-text').css({
+         "font-family":     settings.button.font.family,
+         "font-weight":     settings.button.font.weight,
+         "font-style":      settings.button.font.style,
+         "text-decoration":  settings.button.font.decoration,
+         "font-size":      '40px',
+         'text-align':      'center',
+         'margin-bottom':   '10px',
         });
-        if($('style#'+settings.id).length == 0) { $("head").append("<style id='"+settings.id+"'></style>"); }
-        $("style#"+settings.id).append(rules);
-      },
-      attach: function(identifier, rule)
-      {
-        var obj = {}; obj[identifier] = rule;
-        priv.styles.generate(obj);
-      },
-      mobile: function(identifier, rule)
-      {
-        var query = '@media (max-width: 760px) {\n';
-        if($('style#'+settings.id).length == 0) { $("head").append("<style id='"+settings.id+"'></style>"); }
+        //Append our button to our parent container
+        $(priv.container).append(btnDiv);
 
-        query += identifier + " {\n";
-        $.each(rule, function(property, r) {
-          query += "\t"+property+":"+r+";\n";
+        //Find our true size with an invisible element
+        var sw = settings.help.greeting.width(settings.button.font.style + ' ' + 'normal ' + settings.button.font.weight + ' ' + '40px' + ' ' + settings.button.font.family);
+        //Set the width of the button container
+        var w = (settings.button.size.x >  sw ? settings.button.size.x  : sw) + 'px';
+
+        //Give our container some styling
+        $(btnDiv).css({
+         'width': sw + 30 + 'px',
+         'height': settings.button.size.y + $('.greeting-text').innerHeight() + 10 + 'px',
+         'position': 'absolute',
+         'pointer-events': 'all',
+         'margin': 'auto auto',
+         'text-align': 'center',
+         'padding': '15px',
+         'background-color': 'rgba(255,255,255,0.75)',
+         'border': '1px black solid',
+         'border-radius': '5px',
         });
-        query += "}\n}\n\n";
+        //Listen for a click event of our button
+        $("#"+settings.id+"-action").on('click', function() {
+         $(document).trigger('helpoverlay-buttonclicked', [settings.id]); //Fire a custom event when the button is clicked, and attach the ID of the particular element.
+        });
+      }
+     }
+   }
 
-        $("style#"+settings.id).append(query);
-      },
-    };
+   priv.styles = {
+     //Handle any generation-related function to build our stylesheet
+     build: function() {
+      priv.styles.generate(); //Generate our stylesheet
+     },
+     //Adds or overrides new styles
+     add: function(identifier, rule) {
+      if(priv.CSS[identifier] == null) { priv.CSS[identifier] = {}; } //Make sure there's an object that we can attach to.
+      $.extend(priv.CSS[identifier], rule); //Extend our existing rule object with our new rules.
+     },
+     //Generates our stylesheet from the existing CSS rules, and adds it to the head element of the page.
+     generate: function(obj) {
+      var rules = ""; //sets the initial string.
+      if(obj == undefined) { rules = priv.CSS; } //If there's nothing in particular to generate, generate from the stored information.
 
-    return pub;
+      $.each(obj, function(id, props) //Loop through each of the identifiers, and process each one.
+      {
+        rules += id + " {\n"; //Add the identifier and start the style block
+        $.each(props, function(property, rule) { //Loop through each rule of the indentifier
+         rules += "\t"+property+":"+rule+";\n"; //Add the rule to our block
+        });
+        rules += "}\n\n"; //Close our style block
+      });
+      if($('style#'+settings.id).length == 0) { $("head").append("<style id='"+settings.id+"'></style>"); } //If our plugins stylesheet doesn't exist yet, create it and add it.
+      $("style#"+settings.id).append(rules); //Add our rules to our plugins style block.
+     },
+     //Attach an identifier and a set of rules directly to the stylesheet, using our generate function.
+     attach: function(identifier, rule) {
+      var obj = {}; obj[identifier] = rule; //Build an object to pass to the generate function
+      priv.styles.generate(obj); //Generate our style
+     },
+     //Attach script to a pre-defined media query, useful for mobile-needed responsive CSS
+     mobile: function(identifier, rule) {
+      var query = '@media (max-width: 760px) {\n'; //Media query. Change size here if necessary.
+      if($('style#'+settings.id).length == 0) { $("head").append("<style id='"+settings.id+"'></style>"); } //Create our style tag if it doesn't exist yet.
+
+      query += identifier + " {\n"; //Add our identifier, like in our generate codeblock
+      $.each(rule, function(property, r) {
+        query += "\t"+property+":"+r+";\n";
+      });
+      query += "}\n}\n\n";
+
+      $("style#"+settings.id).append(query); //Append our media query to our style block
+     },
+   };
+   //Return our public facing content
+   return pub;
   }
 
-  var items = {};
+  var items = {}; //Registered plugin items
   function manager() {
-    var pub = {};
+   var pub = {};
 
-    pub.register = function(id, props)
-    {
-      if(items.hasOwnProperty(id)) { console.error("Can't reregister item."); return items[id]; }
-      else {
-        if(props == undefined) { props = {}; }
-        if(!props.hasOwnProperty('id')) { props = $.extend(true, props, {'id':id}); }
-        var p = new plugin(props);
-        items[id] = p; if(p.hasOwnProperty('_construct')) { if(typeof p._construct == 'function') { p._construct(); } } return p;
-      }
-    }
+   pub.register = function(id, props)
+   {
+     if(items.hasOwnProperty(id)) { console.error("Can't reregister item."); return items[id]; }
+     else {
+      if(props == undefined) { props = {}; }
+      if(!props.hasOwnProperty('id')) { props = $.extend(true, props, {'id':id}); }
+      var p = new plugin(props);
+      items[id] = p; if(p.hasOwnProperty('_construct')) { if(typeof p._construct == 'function') { p._construct(); } } return p;
+     }
+   }
 
-    pub.get = function(id)
-    {
-      if(items.hasOwnProperty(id)) { return items[id]; }
-      else { console.error("Item with ID `" + id + "` doesn't exist. Register your item before you use .get()"); return false; }
-    }
+   pub.get = function(id)
+   {
+     if(items.hasOwnProperty(id)) { return items[id]; }
+     else { console.error("Item with ID `" + id + "` doesn't exist. Register your item before you use .get()"); return false; }
+   }
 
-    pub.delete = function(id)
-    {
-      if(items.hasOwnProperty(id)) { delete items[id]; return items.hasOwnProperty(id); }
-    }
+   pub.delete = function(id)
+   {
+     if(items.hasOwnProperty(id)) { delete items[id]; return items.hasOwnProperty(id); }
+   }
 
-    pub.dump = function()
-    {
-      console.log(items);
-    }
+   pub.dump = function()
+   {
+     console.log(items);
+   }
 
-    return pub;
+   return pub;
   }
   return manager;
-}(jQuery)))
+}(jQuery)));

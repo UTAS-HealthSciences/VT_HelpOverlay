@@ -1,7 +1,7 @@
-window.plugin = window.plugin || {};
-window.plugin.helpoverlay = window.plugin.helpoverlay || plugin_helpOverlay();
+window.plugin = window.plugin || {}; //Gets our plugin container, or sets it if it doesn't exist
+window.plugin.helpoverlay = window.plugin.helpoverlay || plugin_helpOverlay(); //Gets our HelpOverlay plugin manager, or attaches it if null
 
-window.help = window.help || {};
+window.help = window.help || {}; //Sets up a shorthand to our particular object.
 
 //Property getting helper function.
 function getProp(property, type, pluginID)
@@ -15,16 +15,16 @@ function getProp(property, type, pluginID)
   return val;
 }
 
-var p='{{p.id}}';
+var p='{{p.id}}'; //Will return our plugin ID. Used as shorthand for the getProp function calls
 
-var deco = [];
-if(getProp("text_font_underline", "bool", p)) { deco.push('underline'); }
-if(getProp("text_font_strikethrough", "bool", p)) { deco.push('strikethrough'); }
+var deco = []; //Text decoration container
+if(getProp("text_font_underline", "bool", p)) { deco.push('underline'); } //Add underline to our array
+if(getProp("text_font_strikethrough", "bool", p)) { deco.push('strikethrough'); } //Add strikethrough to our array
 
-var bc = ktools.Color.hex2rgb(getProp("button_backgroundColor", "string", p));
-bc.push(getProp("button_backgroundAlpha", "float", p));
+var bc = ktools.Color.hex2rgb(getProp("button_backgroundColor", "string", p)); //Gets our RGB array of colours
+bc.push(getProp("button_backgroundAlpha", "float", p)); //Add the alpha to the end of our colour array
 
-window.help = window.plugin.helpoverlay.register(p, {
+window.help = window.plugin.helpoverlay.register(p, { //Register our plugin and set the properties. Gets properties from `helpoverlay.tmpl`
   parent: '#panoDIV',
   id: p,
   button: {
@@ -48,9 +48,19 @@ window.help = window.plugin.helpoverlay.register(p, {
     text: getProp('button_text', 'string', p),
     style: {},
   },
+  help: {
+    hijack: getProp('help_hijack', 'bool', p),
+    icon: getProp("help_icon", "string", p),
+    onstart: getProp('help_onstart', 'bool', p),
+    greeting: getProp('greeting', 'string', p),
+  },
 });
-$(document).trigger('helpoverlay.ready');
+$(document).trigger('helpoverlay.ready'); //Trigger the notice that the helpoverlay has been registered.
 $(document).on('helpoverlay-buttonclicked', function() {
-  console.log('hiding window');
-  window.help.visible(false);
+  window.help.display(false); //If the button has been clicked, hide the overlay.
+});
+
+$(document).on('pano_helpOpened pano_helpClosed', function(event) {
+  window.help.toggleHelp(); //Open or close the help overlay when the Control DBar buttons are clicked.
+  $(document).trigger('cA_event', {category: 'Tour Interactions', action: 'click', label: 'View Help', projectEvent: true});
 });
